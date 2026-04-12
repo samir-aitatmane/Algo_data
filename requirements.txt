@@ -1,0 +1,18 @@
+# Pipeline ETL
+requests>=2.31
+pandas>=2.1
+python-dotenv>=1.0
+numpy>=1.26
+
+# API REST
+fastapi>=0.111
+uvicorn[standard]>=0.29
+pydantic>=2.6
+
+# Bases de données
+pymongo>=4.6
+sqlalchemy>=2.0
+psycopg2-binary>=2.9
+
+# Utilitaires
+zipfile36>=0.1.3

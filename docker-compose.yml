@@ -1,0 +1,64 @@
+version: "3.9"
+
+services:
+
+  # ── MongoDB — Staging / NoSQL ────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: tourisdata_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: tourisme
+      MONGO_INITDB_ROOT_PASSWORD: tourisme
+      MONGO_INITDB_DATABASE: tourisdata
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── PostgreSQL — Data Warehouse ──────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: tourisdata_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER:     tourisme
+      POSTGRES_PASSWORD: tourisme
+      POSTGRES_DB:       tourisdata
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tourisme -d tourisdata"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── API FastAPI ──────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    container_name: tourisdata_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data_lake:/app/data_lake:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+
+volumes:
+  mongo_data:
+  pg_data:

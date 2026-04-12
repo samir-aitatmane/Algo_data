@@ -1,0 +1,50 @@
+# OS & IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Environnement et Secrets (TRÈS IMPORTANT)
+.env
+.env.*
+*.pem
+
+# Python / Data Science (Backend et Pipelines)
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.pytest_cache/
+.coverage
+.ipynb_checkpoints/
+
+# Node.js / Web (Frontend)
+node_modules/
+dist/
+build/
+.next/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Fichiers de données (Data Lake)
+# Ne jamais versionner de grosses bases de données ou fichiers de données brutes
+*.csv
+*.tsv
+*.xlsx
+*.parquet
+*.sqlite
+*.db
+*.json
+
+# Vous pouvez ignorer tout le contenu de data_lake
+data_lake/raw/
+data_lake/clean/
+data_lake/processed/
+
+# Logs
+logs/
+*.log

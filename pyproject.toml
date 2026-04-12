@@ -1,0 +1,30 @@
+[tool.pytest.ini_options]
+# ─── Configuration pytest ─────────────────────────────────────────────────────
+testpaths     = ["tests"]          # Cherche les tests uniquement dans /tests
+python_files  = ["test_*.py"]      # Fichiers de test commençant par test_
+python_classes= ["Test*"]          # Classes de test commençant par Test
+python_functions = ["test_*"]      # Fonctions de test commençant par test_
+
+# Affichage
+addopts = """
+    -v
+    --tb=short
+    --color=yes
+    --durations=10
+    --no-header
+    -p no:warnings
+"""
+# Options expliquées :
+#   -v            : verbose (affiche le nom de chaque test)
+#   --tb=short    : traceback court en cas d'échec
+#   --color=yes   : couleurs dans l'affichage
+#   --durations=10: affiche les 10 tests les plus lents
+#   -p no:warnings: masque les warnings Python pour un affichage plus propre
+
+# Marqueurs personnalisés (évite les warnings "unknown marker")
+markers = [
+    "unit: tests unitaires (rapides, sans I/O)",
+    "integration: tests d'intégration (flux complets)",
+    "api: tests de l'API REST",
+    "slow: tests lents (à exclure avec -m 'not slow')",
+]

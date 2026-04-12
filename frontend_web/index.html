@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TourisData — Hébergements touristiques en France</title>
+  <meta name="description" content="Explorez les hébergements touristiques classés en France : hôtels, campings, résidences, villages de vacances. Données ouvertes data.gouv.fr." />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet (carte) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Leaflet MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* ── Design system ──────────────────────────────────────────────────── */
+    :root {
+      --bg:         #0f1117;
+      --bg-card:    #1a1d27;
+      --bg-input:   #242736;
+      --border:     #2e3347;
+      --accent:     #4f8ef7;
+      --accent2:    #7c5df9;
+      --success:    #22d3a5;
+      --warning:    #f59e0b;
+      --text:       #e2e6f3;
+      --text-muted: #8b92b3;
+      --radius:     12px;
+      --shadow:     0 4px 24px rgba(0,0,0,.45);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #141726 0%, #1c2035 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      backdrop-filter: blur(12px);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .logo-icon { font-size: 1.5rem; }
+
+    nav { display: flex; gap: 1.5rem; }
+    nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: .875rem;
+      font-weight: 500;
+      transition: color .2s;
+    }
+    nav a:hover { color: var(--text); }
+
+    /* ── Hero ────────────────────────────────────────────────────────────── */
+    .hero {
+      padding: 3rem 2rem 2rem;
+      text-align: center;
+      background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(79,142,247,.15) 0%, transparent 70%);
+    }
+
+    .hero h1 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 700;
+      margin-bottom: .75rem;
+      background: linear-gradient(135deg, #fff 0%, #a8b8e8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      color: var(--text-muted);
+      font-size: 1rem;
+      max-width: 600px;
+      margin: 0 auto 2rem;
+      line-height: 1.7;
+    }
+
+    /* ── Stats cards ─────────────────────────────────────────────────────── */
+    .stats-bar {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.5rem;
+      text-align: center;
+      min-width: 140px;
+      transition: transform .2s, box-shadow .2s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 32px rgba(79,142,247,.2);
+    }
+
+    .stat-card .value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .stat-card .label {
+      font-size: .75rem;
+      color: var(--text-muted);
+      margin-top: .25rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+
+    /* ── Main layout ──────────────────────────────────────────────────────── */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 2rem 2rem;
+    }
+
+    .grid-main {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .grid-main { grid-template-columns: 1fr; }
+    }
+
+    /* ── Filters panel ────────────────────────────────────────────────────── */
+    .filters-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      position: sticky;
+      top: 80px;
+    }
+
+    .filters-panel h2 {
+      font-size: .875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-muted);
+      margin-bottom: 1.25rem;
+    }
+
+    .filter-group { margin-bottom: 1.25rem; }
+
+    .filter-group label {
+      display: block;
+      font-size: .8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: .4rem;
+    }
+
+    .filter-group input,
+    .filter-group select {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: .6rem .9rem;
+      font-size: .875rem;
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color .2s;
+      appearance: none;
+    }
+
+    .filter-group input:focus,
+    .filter-group select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(79,142,247,.15);
+    }
+
+    .btn-search {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: .75rem;
+      font-size: .9rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: opacity .2s, transform .15s;
+      margin-top: .5rem;
+    }
+
+    .btn-search:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-search:active { transform: translateY(0); }
+
+    .btn-reset {
+      width: 100%;
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .6rem;
+      font-size: .8rem;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      margin-top: .5rem;
+      transition: color .2s, border-color .2s;
+    }
+
+    .btn-reset:hover { color: var(--text); border-color: var(--text-muted); }
+
+    /* ── Right col tabs ──────────────────────────────────────────────────── */
+    .right-col { display: flex; flex-direction: column; gap: 1.5rem; }
+
+    .tabs {
+      display: flex;
+      gap: .5rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: .5rem;
+    }
+
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      color: var(--text-muted);
+      padding: .6rem;
+      font-size: .85rem;
+      font-weight: 500;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+    }
+
+    /* ── Map ─────────────────────────────────────────────────────────────── */
+    #map {
+      height: 480px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .leaflet-popup-content-wrapper {
+      background: var(--bg-card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+    }
+
+    .leaflet-popup-tip { background: var(--bg-card); }
+    .leaflet-control-zoom a {
+      background: var(--bg-card) !important;
+      color: var(--text) !important;
+      border-color: var(--border) !important;
+    }
+
+    .popup-content { font-size: .85rem; line-height: 1.6; }
+    .popup-content strong { color: var(--accent); }
+
+    .stars { color: var(--warning); letter-spacing: 2px; }
+
+    /* ── Chart container ─────────────────────────────────────────────────── */
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+    }
+
+    .chart-card h3 {
+      font-size: .875rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 1rem;
+    }
+
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 700px) { .charts-row { grid-template-columns: 1fr; } }
+
+    /* ── Results list ────────────────────────────────────────────────────── */
+    #tab-list { display: none; }
+    #tab-map  { display: block; }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .results-count {
+      font-size: .85rem;
+      color: var(--text-muted);
+    }
+
+    .results-count span {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .hebergement-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+
+    .heb-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      transition: transform .2s, box-shadow .2s, border-color .2s;
+      cursor: pointer;
+    }
+
+    .heb-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(79,142,247,.15);
+      border-color: var(--accent);
+    }
+
+    .heb-card .type-badge {
+      display: inline-block;
+      background: rgba(79,142,247,.15);
+      color: var(--accent);
+      border-radius: 99px;
+      padding: .2rem .7rem;
+      font-size: .7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: .6rem;
+    }
+
+    .heb-card h4 {
+      font-size: .95rem;
+      font-weight: 600;
+      margin-bottom: .3rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .heb-card .location {
+      font-size: .78rem;
+      color: var(--text-muted);
+      margin-bottom: .5rem;
+    }
+
+    .heb-card .meta {
+      display: flex;
+      gap: .75rem;
+      font-size: .75rem;
+      color: var(--text-muted);
+      align-items: center;
+    }
+
+    /* ── Pagination ──────────────────────────────────────────────────────── */
+    .pagination {
+      display: flex;
+      gap: .5rem;
+      justify-content: center;
+      margin-top: 1.5rem;
+    }
+
+    .page-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 8px;
+      padding: .5rem .9rem;
+      font-size: .85rem;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .page-btn:hover, .page-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    /* ── Loading spinner ─────────────────────────────────────────────────── */
+    .spinner {
+      display: none;
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+
+    .spinner.show { display: block; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner-icon {
+      display: inline-block;
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Error ───────────────────────────────────────────────────────────── */
+    .error-msg {
+      background: rgba(239,68,68,.1);
+      border: 1px solid rgba(239,68,68,.3);
+      border-radius: var(--radius);
+      padding: 1rem 1.5rem;
+      color: #fca5a5;
+      font-size: .875rem;
+      display: none;
+    }
+
+    .error-msg.show { display: block; }
+
+    /* ── Source badges ───────────────────────────────────────────────────── */
+    .sources-row {
+      display: flex;
+      gap: .5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+
+    .source-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: .3rem .9rem;
+      font-size: .75rem;
+      color: var(--text-muted);
+    }
+
+    .source-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <span class="logo-icon">🏖️</span>
+    TourisData
+  </div>
+  <nav>
+    <a href="#carte">Carte</a>
+    <a href="#graphiques">Statistiques</a>
+    <a href="http://localhost:8000/docs" target="_blank">API</a>
+  </nav>
+</header>
+
+<!-- ── Hero ───────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <h1>Hébergements touristiques en France</h1>
+  <p>
+    Explorez les hébergements classés, campings, résidences et villages de vacances
+    à partir des données ouvertes <strong>data.gouv.fr</strong>.
+  </p>
+
+  <div class="sources-row">
+    <div class="source-badge"><span class="source-dot" style="background:#4f8ef7"></span>DATAtourisme</div>
+    <div class="source-badge"><span class="source-dot" style="background:#22d3a5"></span>Atout France</div>
+    <div class="source-badge"><span class="source-dot" style="background:#f59e0b"></span>INSEE Fréquentation</div>
+    <div class="source-badge"><span class="source-dot" style="background:#a78bfa"></span>API Géo</div>
+  </div>
+
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat-card"><div class="value" id="stat-total">—</div><div class="label">Hébergements</div></div>
+    <div class="stat-card"><div class="value" id="stat-hotels">—</div><div class="label">Hôtels</div></div>
+    <div class="stat-card"><div class="value" id="stat-campings">—</div><div class="label">Campings</div></div>
+    <div class="stat-card"><div class="value" id="stat-residences">—</div><div class="label">Résidences</div></div>
+    <div class="stat-card"><div class="value" id="stat-depts">—</div><div class="label">Départements</div></div>
+  </div>
+</section>
+
+<!-- ── Main ───────────────────────────────────────────────────────────────── -->
+<div class="container">
+  <div class="grid-main">
+
+    <!-- Panneau filtres -->
+    <aside class="filters-panel">
+      <h2>🔎 Filtres</h2>
+
+      <div class="filter-group">
+        <label for="f-type">Type d'hébergement</label>
+        <select id="f-type">
+          <option value="">Tous les types</option>
+          <option value="hotel">🏨 Hôtel</option>
+          <option value="camping">⛺ Camping</option>
+          <option value="residence">🏢 Résidence</option>
+          <option value="village_vacances">🌄 Village de vacances</option>
+          <option value="auberge">🏠 Auberge</option>
+          <option value="location">🔑 Location (Airbnb, Meublé)</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="f-etoiles">Classement (étoiles)</label>
+        <select id="f-etoiles">
+          <option value="">Toutes catégories</option>
+          <option value="1">⭐ 1 étoile</option>
+          <option value="2">⭐⭐ 2 étoiles</option>
+          <option value="3">⭐⭐⭐ 3 étoiles</option>
+          <option value="4">⭐⭐⭐⭐ 4 étoiles</option>
+          <option value="5">⭐⭐⭐⭐⭐ 5 étoiles</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="f-dept">Département</label>
+        <input id="f-dept" type="text" placeholder="Ex : Paris, Alpes…" />
+      </div>
+
+      <div class="filter-group">
+        <label for="f-ville">Ville</label>
+        <input id="f-ville" type="text" placeholder="Ex : Nice, Lyon…" />
+      </div>
+
+      <div class="filter-group">
+        <label for="f-source">Source des données</label>
+        <select id="f-source">
+          <option value="">Toutes sources</option>
+          <option value="atout_france">Atout France</option>
+          <option value="datatourisme">DATAtourisme</option>
+        </select>
+      </div>
+
+      <button class="btn-search" id="btn-search" onclick="search(1)">
+        🔍 Rechercher
+      </button>
+      <button class="btn-reset" onclick="resetFilters()">
+        Réinitialiser les filtres
+      </button>
+    </aside>
+
+    <!-- Contenu principal -->
+    <div class="right-col">
+
+      <!-- Tabs -->
+      <div class="tabs" id="carte">
+        <button class="tab-btn active" id="tab-map-btn"  onclick="switchTab('map')">🗺️ Carte</button>
+        <button class="tab-btn"        id="tab-list-btn" onclick="switchTab('list')">📋 Liste</button>
+      </div>
+
+      <!-- Erreur -->
+      <div class="error-msg" id="error-msg">
+        ⚠️ Impossible de contacter l'API. Assurez-vous que le pipeline ETL a été exécuté
+        et que l'API tourne sur <code>http://localhost:8000</code>.
+      </div>
+
+      <!-- Spinner -->
+      <div class="spinner" id="spinner">
+        <div class="spinner-icon"></div>
+        <div>Chargement des données…</div>
+      </div>
+
+      <!-- Carte Leaflet -->
+      <div id="tab-map">
+        <div id="map"></div>
+      </div>
+
+      <!-- Liste cards -->
+      <div id="tab-list" style="display:none">
+        <div class="results-header">
+          <div class="results-count">
+            <span id="total-display">0</span> hébergements trouvés
+          </div>
+        </div>
+        <div class="hebergement-grid" id="results-grid"></div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+
+    </div><!-- /right-col -->
+  </div><!-- /grid-main -->
+
+  <!-- ── Graphiques ──────────────────────────────────────────────────────── -->
+  <section id="graphiques" style="margin-top:2rem">
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>📊 Répartition par type</h3>
+        <canvas id="chart-type" height="220"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>⭐ Répartition par étoiles</h3>
+        <canvas id="chart-etoiles" height="220"></canvas>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /container -->
+
+<!-- ── Scripts ─────────────────────────────────────────────────────────────── -->
+<script>
+const API = 'http://localhost:8000';
+
+let map, markerCluster;
+let currentPage = 1;
+let currentTotal = 0;
+const PER_PAGE = 20;
+
+// ── Type badge colors ───────────────────────────────────────────────────────
+const TYPE_COLORS = {
+  hotel:           '#4f8ef7',
+  camping:         '#22d3a5',
+  residence:       '#a78bfa',
+  village_vacances:'#f59e0b',
+  auberge:         '#f97316',
+  hebergement:     '#64748b',
+};
+
+const TYPE_ICONS = {
+  hotel: '🏨', camping: '⛺', residence: '🏢',
+  village_vacances: '🌄', auberge: '🏠',
+};
+
+// ── Init ────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  loadStats();
+  search(1);
+});
+
+// ── Map ─────────────────────────────────────────────────────────────────────
+function initMap() {
+  map = L.map('map', { zoomControl: true }).setView([46.8, 2.3], 6);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CartoDB',
+    maxZoom: 19
+  }).addTo(map);
+
+  markerCluster = L.markerClusterGroup({
+    chunkedLoading: true,
+    maxClusterRadius: 60,
+  });
+  map.addLayer(markerCluster);
+}
+
+function createMarkerIcon(type) {
+  const color = TYPE_COLORS[type] || '#8b92b3';
+  const icon  = TYPE_ICONS[type] || '📍';
+  return L.divIcon({
+    html: `<div style="
+      background:${color};
+      width:32px;height:32px;border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg);
+      border:2px solid rgba(255,255,255,.5);
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 2px 8px rgba(0,0,0,.4);">
+      <span style="transform:rotate(45deg);font-size:14px">${icon}</span>
+    </div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -34],
+    className: '',
+  });
+}
+
+function addMarkersToMap(data) {
+  markerCluster.clearLayers();
+  const markers = [];
+
+  data.forEach(h => {
+    if (!h.latitude || !h.longitude) return;
+    const marker = L.marker([h.latitude, h.longitude], {
+      icon: createMarkerIcon(h.type)
+    });
+
+    const stars = h.etoiles ? '⭐'.repeat(Math.min(h.etoiles, 5)) : '';
+    marker.bindPopup(`
+      <div class="popup-content">
+        <strong>${h.nom || 'Sans nom'}</strong><br/>
+        <span class="stars">${stars}</span>
+        ${h.etoiles ? `<small>${h.etoiles} étoile${h.etoiles > 1 ? 's' : ''}</small>` : ''}<br/>
+        📍 ${h.ville || ''}${h.departement ? ` (${h.departement})` : ''}<br/>
+        🏷️ ${h.type || ''}<br/>
+        ${h.nb_chambres ? `🛏️ ${h.nb_chambres} chambres<br/>` : ''}
+        ${h.telephone ? `📞 ${h.telephone}<br/>` : ''}
+        ${h.site_web ? `<a href="${h.site_web}" target="_blank" style="color:var(--accent)">🌐 Site web</a>` : ''}
+        <br/><small style="color:#666">${h.source || ''}</small>
+      </div>
+    `);
+    markers.push(marker);
+  });
+
+  markerCluster.addLayers(markers);
+}
+
+// ── Stats & Charts ──────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const [byType, byEtoiles] = await Promise.all([
+      fetch(`${API}/stats?groupby=type`).then(r => r.json()),
+      fetch(`${API}/stats?groupby=etoiles`).then(r => r.json()),
+    ]);
+
+    // Stat cards
+    document.getElementById('stat-total').textContent = fmt(byType.total_hebergements);
+    const rep = byType.repartition || [];
+    const find = (t) => (rep.find(r => r.type === t) || {}).nb_hebergements || 0;
+    document.getElementById('stat-hotels').textContent    = fmt(find('hotel'));
+    document.getElementById('stat-campings').textContent  = fmt(find('camping'));
+    document.getElementById('stat-residences').textContent = fmt(find('residence'));
+
+    // Nb départements via geo API
+    try {
+      const depts = await fetch(`${API}/geo/departements`).then(r => r.json());
+      document.getElementById('stat-depts').textContent = depts.length || '—';
+    } catch {}
+
+    // Charts
+    drawTypeChart(byType.repartition || []);
+    drawEtoilesChart(byEtoiles.repartition || []);
+
+  } catch (e) {
+    console.warn('Stats API not available:', e);
+  }
+}
+
+function drawTypeChart(data) {
+  const top = data.slice(0, 6);
+  const ctx = document.getElementById('chart-type').getContext('2d');
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: top.map(d => d.type || 'Autre'),
+      datasets: [{
+        data: top.map(d => d.nb_hebergements),
+        backgroundColor: top.map(d => TYPE_COLORS[d.type] || '#64748b'),
+        borderColor: '#1a1d27',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { labels: { color: '#e2e6f3', font: { family: 'Inter' } } }
+      }
+    }
+  });
+}
+
+function drawEtoilesChart(data) {
+  const sorted = [...data].sort((a, b) => (a.etoiles || 0) - (b.etoiles || 0));
+  const ctx = document.getElementById('chart-etoiles').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(d => d.etoiles ? `${d.etoiles}⭐` : 'N/C'),
+      datasets: [{
+        label: 'Hébergements',
+        data: sorted.map(d => d.nb_hebergements),
+        backgroundColor: 'rgba(79,142,247,.7)',
+        borderColor: '#4f8ef7',
+        borderWidth: 1,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b92b3' }, grid: { color: '#2e3347' } },
+        y: { ticks: { color: '#8b92b3' }, grid: { color: '#2e3347' } },
+      }
+    }
+  });
+}
+
+// ── Search ──────────────────────────────────────────────────────────────────
+async function search(page = 1) {
+  currentPage = page;
+  showSpinner(true);
+  showError(false);
+
+  const params = new URLSearchParams({
+    page, per_page: PER_PAGE,
+  });
+
+  const type    = document.getElementById('f-type').value;
+  const etoiles = document.getElementById('f-etoiles').value;
+  const dept    = document.getElementById('f-dept').value.trim();
+  const ville   = document.getElementById('f-ville').value.trim();
+  const source  = document.getElementById('f-source').value;
+
+  if (type)    params.set('type', type);
+  if (etoiles) params.set('etoiles', etoiles);
+  if (dept)    params.set('departement', dept);
+  if (ville)   params.set('ville', ville);
+  if (source)  params.set('source', source);
+
+  try {
+    const res  = await fetch(`${API}/hebergements?${params}`);
+    if (!res.ok) throw new Error(res.statusText);
+    const json = await res.json();
+
+    currentTotal = json.total;
+    document.getElementById('total-display').textContent = fmt(json.total);
+
+    // Mettre à jour la carte
+    addMarkersToMap(json.data);
+
+    // Mettre à jour la liste
+    renderCards(json.data);
+    renderPagination(json.pages);
+
+    showSpinner(false);
+
+  } catch (err) {
+    showSpinner(false);
+    showError(true);
+    console.error(err);
+  }
+}
+
+// ── Cards ────────────────────────────────────────────────────────────────────
+function renderCards(data) {
+  const grid = document.getElementById('results-grid');
+  grid.innerHTML = data.map(h => {
+    const stars  = h.etoiles ? '⭐'.repeat(Math.min(h.etoiles, 5)) : '';
+    const icon   = TYPE_ICONS[h.type] || '📍';
+    const color  = TYPE_COLORS[h.type] || '#64748b';
+    return `
+      <div class="heb-card" onclick="focusOnMap(${h.latitude}, ${h.longitude})">
+        <div class="type-badge" style="background:${color}22;color:${color}">${icon} ${h.type || 'hébergement'}</div>
+        <h4>${h.nom || 'Sans nom'}</h4>
+        <div class="location">📍 ${h.ville || ''}${h.departement ? ` · ${h.departement}` : ''}</div>
+        <div class="meta">
+          <span>${stars || '<small>Non classé</small>'}</span>
+          ${h.nb_chambres ? `<span>🛏️ ${h.nb_chambres}</span>` : ''}
+          <span style="font-size:.7rem;color:#4f8ef7">${h.source || ''}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function focusOnMap(lat, lon) {
+  if (!lat || !lon) return;
+  switchTab('map');
+  map.setView([lat, lon], 14);
+}
+
+// ── Pagination ───────────────────────────────────────────────────────────────
+function renderPagination(totalPages) {
+  const pg = document.getElementById('pagination');
+  let html = '';
+  const maxBtns = 7;
+  let start = Math.max(1, currentPage - 3);
+  let end   = Math.min(totalPages, start + maxBtns - 1);
+  if (end - start < maxBtns - 1) start = Math.max(1, end - maxBtns + 1);
+
+  if (currentPage > 1)
+    html += `<button class="page-btn" onclick="search(${currentPage-1})">‹</button>`;
+  for (let i = start; i <= end; i++)
+    html += `<button class="page-btn${i===currentPage?' active':''}" onclick="search(${i})">${i}</button>`;
+  if (currentPage < totalPages)
+    html += `<button class="page-btn" onclick="search(${currentPage+1})">›</button>`;
+
+  pg.innerHTML = html;
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('tab-map').style.display  = tab==='map'  ? 'block' : 'none';
+  document.getElementById('tab-list').style.display = tab==='list' ? 'block' : 'none';
+  document.getElementById('tab-map-btn').classList.toggle('active',  tab==='map');
+  document.getElementById('tab-list-btn').classList.toggle('active', tab==='list');
+  if (tab === 'map') setTimeout(() => map.invalidateSize(), 100);
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function resetFilters() {
+  ['f-type','f-etoiles','f-source'].forEach(id => document.getElementById(id).value = '');
+  ['f-dept','f-ville'].forEach(id => document.getElementById(id).value = '');
+  search(1);
+}
+
+function showSpinner(show) {
+  document.getElementById('spinner').classList.toggle('show', show);
+}
+
+function showError(show) {
+  document.getElementById('error-msg').classList.toggle('show', show);
+}
+
+function fmt(n) {
+  if (!n && n !== 0) return '—';
+  return Number(n).toLocaleString('fr-FR');
+}
+</script>
+
+</body>
+</html>
